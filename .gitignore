@@ -1,0 +1,12 @@
+node_modules/
+studio/node_modules/
+studio/dist/
+data/output/
+data/uploads/
+data/tmp/
+data/sfx/
+.env
+*.log
+*.tsbuildinfo
+data/autosfx.db*
+data/settings.json

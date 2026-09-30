@@ -1,0 +1,212 @@
+================================================================================
+AutoTimingSFX — CATATAN PROYEK (dari diskusi awal, jangan hilang saat kompak)
+================================================================================
+
+IDE INTI
+--------
+Project AI untuk TIMING SFX: memilih SFX dari library milik sendiri dan
+meletakkannya pada timestamp yang tepat (timing visual / whisper timing),
+berdasarkan detik-detik spesifik di video.
+
+- SFX yang dipakai: SFX ASLI yang familiar di telinga manusia.
+- JANGAN pakai SFX AI-generated (bukan ElevenLabs dsb).
+- Database berisi DESKRIPSI MP3 SFX (mis. "aduh tunggu") supaya AI tahu
+  memilah/memilih SFX yang sesuai timing.
+- Deskripsi SFX DITULIS MANUSIA (user sendiri) — sentuhan emosi manusia.
+  AI TIDAK boleh menebak/mendeskripsikan isi SFX (bakal halusinasi).
+  AI hanya: meng-embedding-kan teks deskripsi untuk pencarian semantik.
+- Verdict: BISA dibuat, bukan halusinasi. Precedent: StoryCut, Shorz,
+  Ace Studio — tapi mayoritas pakai AI-generated/library mereka sendiri.
+  Gap kita: library SENDIRI + deskripsi manusia + picker timing.
+
+ALUR INGEST SFX (user confirm)
+------------------------------
+1. User download "aduh_tunggu.mp3"
+2. Studio UI → halaman Library → tombol Import
+3. File di-copy ke data/sfx/
+4. Kartu muncul + waveform player → user DENGARKAN dulu
+5. User TULIS deskripsi manual + tag (mis. "cewek bilang 'aduh tunggu'
+   nada panik, komedi" / tag: komedi, vokal, panik)
+6. Klik Save
+7. Backend: simpan metadata ke DB + auto-embed vktor + analisis audio
+   (durasi, onset_ms, LUFS)
+
+DATABASE
+--------
+- Bukan di UI. File SQLite di disk: data/autosfx.db
+- UI studio hanyalah jendela untuk mengelola.
+- Alur: Studio UI (browser) → API server (Node) → autosfx.db + data/sfx/*.mp3
+- Kalau .db hilang, yang hilang deskripsi/tag — MP3 asli aman di data/sfx/.
+- Skema: sfx(id, file_path, description, tags, category, duration_ms,
+  lufs, onset_ms, embedding, created_at) + jobs + settings
+
+STRUKTUR FOLDER (3 folder — user pilih kombinasi ini)
+-----------------------------------------------------
+E:\project\AutoTimingSFX\
+├── data/                    ← SEMUA data (aman dari rebuild kode)
+│   ├── autosfx.db           ← SQLite: deskripsi, tag, embedding, jobs
+│   ├── sfx/                 ← MP3 SFX yang diimport
+│   ├── uploads/             ← video yang diupload
+│   └── output/jobs/<jobId>/ ← video jadi + cue_list.json per job
+├── src/                     ← kode backend (API server, pipeline, ffmpeg)
+└── studio/                  ← kode UI (Vite + React)
+
+STACK & KONFIGURASI
+-------------------
+- Node 20+ (terdeteksi v25), TypeScript, monorepo npm workspaces
+- API server port 3132 (movie2short pakai 3131 — jangan bentrok)
+- Studio UI: Vite + React, WEB APP DI BROWSER (bukan Electron,
+  BUKAN streamlit/gradio — UI sendiri)
+- Tema UI: STUDIO GELAP, jangan datar/biasa. Tone warna: ungu/hitam,
+  merah/hitam, biru/hitam — pokoknya tone warna bagus untuk studio.
+- ENV universal (pola movie2short): OPENAI_BASE_URL, OPENAI_API_KEY,
+  MODEL_NAME, VLM_MODEL, EMBEDDING_MODEL, AUDIOCPP_SERVER=http://localhost:8080,
+  PORT=3132
+- LLM: OpenAI-compatible via ENV (universal). Model diambil dari ENV.
+
+MODE TRANKRIPSI — DUA MODE (whisper.cpp = RENCANA MASA DEPAN, JANGAN DISENTUH)
+-------------------------------------------------------------------------------
+1. WHISPER ONNX (default, lokal) — transformers.js + onnxruntime,
+   model ladder sama dengan tscaps (E:\project\tscaps), default MEDIUM
+   (user: "400 MB, yang medium" — model tertinggi yang dipakai tscaps).
+   Ladder: tiny/base/small/medium (onnx-community/whisper-*_timestamped).
+2. AUDIO.CPP — localhost:8080 (808 sudah dipakai audio CPP, jadi 8080).
+   = github.com/0xShug0/audio.cpp (indie, server sendiri, tinggal panggil API).
+   Endpoint OpenAI-compatible /v1/audio/transcriptions +
+   timestamp_granularities[]=word (word-level + forced alignment).
+   (di movie2short: audiocpp_server dipakai utk TTS Higgs/OmniVoice;
+   di project ini dipakai utk ASR/transcription — server terpisah, via ENV)
+3. WHISPER CPP — plan mendatang, ide masih proses. SAAT INI JANGAN DIBUAT.
+
+ALUR KERJA (user pilih: ONE-SHOT + riwayat bisa direview)
+---------------------------------------------------------
+Referensi: E:\project\movie2short (pipeline contoh user:
+transkrip + lihat visual → manifest → FFMPEG → selesai, one-shot).
+
+Video + optional prompt
+  → 1. TRANSCRIBE  ffmpeg extract audio → engine (ONNX|audio.cpp)
+                    → word-level timestamps (WAJIB word-level, bukan segment)
+  → 2. VISUAL      extract frame kunci → VLM gateway (ENV) → momen visual
+  → 3. MANIFEST    LLM gabung transcript + momen → "beats" (detik + konteks)
+  → 4. SFX PICK    RAG: embedding cari kandidat → LLM pilih + aturan
+                    kepadatan → cue list JSON {t, sfx_id, gain, lead_ms,
+                    anchor, reason}
+  → 5. RENDER      ffmpeg: adelay (lead offset), ducking di bawah dialog,
+                    loudnorm → video.mp4 + cue_list.json
+- Setiap job simpan cue list → bisa dibuka di UI, diedit (geser timing /
+  ganti SFX), RE-RENDER tanpa ulang pipeline.
+- API call juga ada (tidak hanya UI studio).
+
+ATURAN TIMING (anti "telat")
+----------------------------
+- Impact/whoosh: mulai ~80–150ms SEBELUM anchor (human precedence),
+  disesuaikan onset_ms file (anchor ke onset, bukan awal file).
+- Ambience: fade di awal scene, auto-duck ~-12dB di bawah dialog.
+- Budget kepadatan: default max 1 SFX / 5 detik, hanya beat tertentu
+  (punchline, transisi, reveal) — supaya tidak berantakan.
+- Alasan tiap cue dicatat (reason) supaya bisa diaudit.
+- Lisensi SFX: pakai library sendiri / freesound CC0.
+
+TRAP YANG DIWASPADAI
+---------------------
+- Kebanyakan SFX → berantakan → aturan kepadatan wajib.
+- Whisper timestamp drift → word-level alignment wajib.
+- "Familiar di telinga" susah diukur otomatis → tagging kategori konsisten.
+
+IMPLEMENTASI (fase)
+-------------------
+Fase 0: NOTES.txt (file ini)
+Fase 1: scaffold monorepo + API skeleton + ENV loader
+Fase 2: SFX library (import, analisis ffmpeg, UI deskripsi, embedding, search)
+Fase 3: transkripsi 2 mode (audio.cpp + whisper ONNX)
+Fase 4: VLM visual + manifest + SFX picker RAG
+Fase 5: render FFmpeg + review/re-render cue list
+Fase 6: polish tema studio + dokumentasi API
+
+ENGINE REFERENCE
+----------------
+- tscaps (E:\project\tscaps): whisper ONNX via @huggingface/transformers +
+  onnxruntime-web 1.27, model onnx-community/whisper-*_timestamped,
+  ladder tiny..medium, worker di apps/studio/src/core/transcription.
+- movie2short (E:\project\movie2short): pola API jobs + manifest + ffmpeg,
+  studio React/Vite, ENV-based OpenAI-compatible gateway.
+
+CATATAN TAMBAHAN
+----------------
+- User minta semua catatan disimpan di TXT ini supaya tidak hilang
+  saat konteks terkompresi sistem.
+- User akan review SENDIRI setelah semua pekerjaan selesai.
+- Proyek di E:\project\AutoTimingSFX (folder yang sekarang).
+- ffmpeg 8.1.2 tersedia di mesin. Node v25. Tidak ada Python (tidak perlu).
+
+STATUS IMPLEMENTASI
+-------------------
+Fase 0-5 SELESAI: backend lengkap (library, transkripsi ONNX, VLM, manifest,
+picker RAG, render FFmpeg), tsc --noEmit bersih, smoke test lolos,
+E2E penuh LULUS (scripts/e2e.ts: video TTS Indonesia + 5 SFX seed →
+transkrip 25 kata (whisper-small ONNX) → 7 momen visual → 7 beat →
+1 cue → final.mp4 6.4s).
+
+GATEWAY / MODEL (router.bynara.id — penting!):
+- Akun TANPA kredit: semua model berbayar kena 402/429 "Insufficient
+  credits". Model "-free"/bebasan yang COCOK diuji:
+  * space-bunny-alpha → JSON valid + VISION jalan (pilih gambar beneran)
+  * nemotron-3.5-lightning-free → JSON valid, tapi reasoning-model:
+    lambat (~2 menit/call) & upstream_error sering → kandidat CADANGAN.
+- Konfigurasi final .env: MODEL_NAME=space-bunny-alpha,
+  VLM_MODEL=space-bunny-alpha, LLM_FALLBACK_MODELS=nemotron-3.5-lightning-free.
+- Model "ag/..." (movie2short) TIDAK ADA di router ini; gateway lokal
+  :20128 mati. Ganti model lewat Settings UI / .env kalau user naik kredit.
+
+KEAWETAN LLM (src/openai.ts chatComplete):
+- Gateway kadang balas HTTP 200 tapi body {"error":upstream_error}
+  → dianggap gagal, di-retry (max 4x/model, backoff 1.5s*attempt).
+- Rotasi model: primary gagal → LLM_FALLBACK_MODELS (koma, bisa di-set
+  via UI). 401/402/403/404 langsung lompat model berikutnya.
+- response_format / max_tokens (8192 utk model reasoning) di-drop
+  otomatis kalau ditolak. VLM TIDAK dirotasi (model teks-cadangan
+  diam-diam membuang gambar → jawaban sampah).
+- audio.cpp :8080 hanya punya model TTS (omnivoice), TANPA model ASR →
+  engine "audiocpp" butuh user mendaftarkan model ASR dulu (dokumentasikan).
+
+SISA (belum dikerjakan):
+- Fase 6: studio/ Vite+React UI (tema gelap studio, port jauh dari 5173)
+- test vitest (filter graph, picker, parseJsonLoose, tokenScore)
+- README (termasuk syarat model ASR audio.cpp + model gateway free)
+
+FASE 6 + TEST SELESAI (update akhir)
+------------------------------------
+- studio/ Vite+React selesai: package.json (dev port 5188, proxy /api:3132),
+  tema gelap (ungu/merah/biru di hitam), halaman Library (impor, waveform
+  canvas, editor deskripsi manual), Job Baru, Riwayat, detail Job (poll 2.5s,
+  progress stage, log, video, editor cue → re-render, timeline marker),
+  Pengaturan (semua SETTING_KEYS per grup, API key tersamar).
+- npm run build:studio OK; API menyajikan studio/dist + SPA fallback di :3132.
+- tests/ vitest: 25 test LULUS (util/parseJsonLoose/cosine, buildFilterGraph
+  5 kasus, wordsToSegments, tokenScore, normalizeWords).
+- README.md ditulis (setup, tabel model gateway free, syarat ASR audio.cpp,
+  alur pipeline, skrip).
+- Status: SEMUA FASE SELESAI — menunggu review user.
+- Catatan: verifikasi visual browser belum dilakukan (extension Browser MCP
+  tidak tersambung); sudah diverifikasi via HTTP (index/js/css/api = 200).
+
+GATEWAY 9ROUTER (update — keputusan user)
+------------------------------------------
+- User pindah ke gateway LOKAL 9router: OPENAI_BASE_URL=http://localhost:20128/v1
+  (Proses node custom-server.js milik 9router, PID bisa beda tiap boot;
+  port listening tapi GET /v1/models HANG — jangan pakai untuk daftar model).
+- API key: sk-bdce2**** (lengkap hanya di .env, ter-ignore) (di .env, jangan dicetak lagi).
+- Model: ag/gemini-3.6-flash-high untuk MODEL_NAME DAN VLM_MODEL (teruji teks +
+  vision: jawab "Cyan" utk frame uji).
+- Hanya varian ini yang valid: ag/gemini-3.6-flash, 3.7-flash, 3.5-flash-high,
+  3.6-pro-high semuanya 404; tanpa prefix ag/ → 401. LLM_FALLBACK_MODELS kosong.
+- PENTING: gateway ini MENDAHULUI stream (SSE) kalau field stream tidak dikirim.
+  src/openai.ts: chatComplete selalu kirim stream:false, dan postJson punya
+  parser cadangan yang menyusun ulang konten dari baris data: SSE bila JSON
+  gagal. Jangan hapus keduanya.
+- Router.bynara.id (space-bunny-alpha / nemotron-3.5-lightning-free) masih
+  valid sbg cadangan SEBELUM-nya tapi beda base_url+key → pindah manual di
+  Pengaturan kalau 9router mati.
+- E2E ulang setelah pindah gateway: LULUS (25 kata, 4 momen, 8 beat, 2 cue,
+  final.mp4 6.4s).
+
