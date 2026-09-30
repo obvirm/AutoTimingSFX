@@ -147,27 +147,24 @@ export async function chatJson<T>(messages: ChatMsg[], opts: { model?: string; t
   return parseJsonLoose<T>(raw);
 }
 
-/** Kirim gambar (base64) ke VLM. */
-export async function chatVision(
+/** Kirim segmen video MP4 (base64, termasuk audio) ke VLM. */
+export async function chatVideo(
   text: string,
-  imagesB64: string[],
+  b64Mp4: string,
   opts: { model?: string; timeoutMs?: number } = {}
 ): Promise<string> {
   const s = getSettings();
-  const content: any[] = [{ type: 'text', text }];
-  for (const b64 of imagesB64) {
-    content.push({
-      type: 'image_url',
-      image_url: { url: `data:image/jpeg;base64,${b64}`, detail: 'low' },
-    });
-  }
+  const content: any[] = [
+    { type: 'text', text },
+    { type: 'image_url', image_url: { url: `data:video/mp4;base64,${b64Mp4}` } },
+  ];
   const body: Record<string, unknown> = {
     model: opts.model ?? s.VLM_MODEL,
     messages: [{ role: 'user', content }],
     temperature: 0.2,
     max_tokens: 4096,
   };
-  // tanpa rotasi fallback: model teks-cadangan bisa membuang gambar diam-diam
-  const j = await chatComplete(body, opts.timeoutMs ?? 240_000, { fallback: false });
+  // tanpa rotasi fallback: model teks-cadangan bisa membuang media diam-diam
+  const j = await chatComplete(body, opts.timeoutMs ?? 300_000, { fallback: false });
   return j.choices[0].message.content as string;
 }

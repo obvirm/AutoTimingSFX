@@ -97,18 +97,17 @@ export function createApp(): express.Express {
 
   /* ---------- Jobs ---------- */
   app.post('/api/run', (req, res) => {
-    const { videoPath, prompt = '', engine = 'onnx', options = {} } = req.body ?? {};
+    const { videoPath, prompt = '', options = {} } = req.body ?? {};
     if (!videoPath || !fs.existsSync(videoPath)) {
       return res.status(400).json({ error: 'videoPath tidak valid — upload dulu via /api/upload' });
     }
     const id = newId();
     createJob({
       id,
-      engine: engine === 'audiocpp' ? 'audiocpp' : 'onnx',
       video_name: path.basename(videoPath),
       video_path: videoPath,
       prompt: String(prompt),
-      options: JSON.stringify({ engine, ...options }),
+      options: JSON.stringify({ ...options }),
     });
     addJobEvent(id, 'job dibuat');
     void runJob(id);
@@ -120,7 +119,6 @@ export function createApp(): express.Express {
       id: j.id,
       status: j.status,
       stage: j.stage,
-      engine: j.engine,
       video_name: j.video_name,
       prompt: j.prompt,
       created_at: j.created_at,
@@ -143,7 +141,6 @@ export function createApp(): express.Express {
       id: j.id,
       status: j.status,
       stage: j.stage,
-      engine: j.engine,
       video_name: j.video_name,
       video_path: j.video_path,
       prompt: j.prompt,

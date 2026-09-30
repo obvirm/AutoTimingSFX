@@ -42,7 +42,7 @@ export const api = {
     if (!r.ok) throw new Error(((await r.json()) as { error?: string }).error ?? `HTTP ${r.status}`);
     return (await r.json()) as { videoPath: string; name: string };
   },
-  run: (p: { videoPath: string; prompt: string; engine: string; options?: Record<string, string> }) =>
+  run: (p: { videoPath: string; prompt: string; options?: Record<string, string> }) =>
     jq<{ jobId: string }>('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) }),
 
   listJobs: () => jq<JobSummary[]>('/api/jobs'),

@@ -1,5 +1,5 @@
 import { chatJson } from './openai.js';
-import type { Word } from './transcribe/audiocpp.js';
+import type { VisualMoment } from './visual.js';
 
 export interface Beat {
   t: number;
@@ -9,57 +9,30 @@ export interface Beat {
   notes: string;
 }
 
-/** Kelompokkan word → segmen percakapan (gap > 0.9s = segmen baru). */
-export function wordsToSegments(words: Word[], gapSec = 0.9): { text: string; start: number; end: number; words: Word[] }[] {
-  const segs: { text: string; start: number; end: number; words: Word[] }[] = [];
-  let cur: Word[] = [];
-  for (const w of words) {
-    if (cur.length === 0 || w.start - cur[cur.length - 1].end <= gapSec) cur.push(w);
-    else {
-      segs.push(mkSeg(cur));
-      cur = [w];
-    }
-  }
-  if (cur.length) segs.push(mkSeg(cur));
-  return segs;
-}
-
-function mkSeg(ws: Word[]): { text: string; start: number; end: number; words: Word[] } {
-  return {
-    text: ws.map((w) => w.w).join(' '),
-    start: ws[0].start,
-    end: ws[ws.length - 1].end,
-    words: ws,
-  };
-}
-
 /**
- * Manifest: gabung transcript + momen visual + prompt user → daftar "beat"
+ * Manifest: gabung momen (video+audio dari VLM) + prompt user → daftar "beat"
  * (detik + konteks) yang layak diberi SFX.
  */
 export async function buildManifest(opts: {
-  words: Word[];
-  visual: { t: number; kind: string; desc: string }[];
+  events: VisualMoment[];
   durationSec: number;
   userPrompt: string;
   log: (m: string) => void;
 }): Promise<Beat[]> {
-  const { words, visual, durationSec, userPrompt, log } = opts;
-  const segs = wordsToSegments(words);
+  const { events, durationSec, userPrompt, log } = opts;
 
-  const transcriptBrief = segs
-    .map((s, i) => `[${i + 1}] ${s.start.toFixed(1)}s-${s.end.toFixed(1)}s: ${s.text}`)
-    .slice(0, 120)
-    .join('\n');
-  const visualBrief = visual
-    .map((v, i) => `[${i + 1}] ${v.t}s (${v.kind}) ${v.desc}`)
-    .slice(0, 60)
+  const eventsBrief = events
+    .map((v, i) => {
+      const range = v.end !== undefined ? `${v.t}s-${v.end}s` : `${v.t}s`;
+      return `[${i + 1}] ${range} (${v.kind}) ${v.desc}`;
+    })
+    .slice(0, 80)
     .join('\n');
 
   const sys = [
     'Kamu sound designer berpengalaman. Tugasmu: menemukan BEAT (titik momen) dalam video yang LAYAK diberi sound effect.',
-    'Beat yang bagus: punchline komedi, reveal/kejutan, transisi scene, momen tegang, aksi visual kuat, hook pembuka, dan penutup.',
-    'Hindari beat di tengah kalimat biasa — SFX di sana akan berantakan.',
+    'Beat yang bagus: punchline komedi, reveal/kejutan, transisi scene, momen tegang, aksi visual kuat, puncak audio (teriakan/dentum), hook pembuka, dan penutup.',
+    'Hindari beat di tengah momen biasa — SFX di sana akan berantakan.',
     '',
     `Video berdurasi ${durationSec.toFixed(1)} detik. Maksimal 40 beat, diurutkan menaik.`,
     userPrompt ? `Panduan tambahan dari user: ${userPrompt}` : '',
@@ -71,11 +44,8 @@ export async function buildManifest(opts: {
     .join('\n');
 
   const user = [
-    'TRANSCRIPT (word-accurate, per segmen):',
-    transcriptBrief || '(tidak ada transkrip)',
-    '',
-    'MOMEN VISUAL:',
-    visualBrief || '(tidak ada analisis visual)',
+    'MOMEN (hasil analisis VLM, visual DAN audio, timestamp global):',
+    eventsBrief || '(tidak ada momen terdeteksi — video kemungkinan sepi; balas {"beats":[]})',
   ].join('\n');
 
   const j = await chatJson<{ beats: Beat[] }>([

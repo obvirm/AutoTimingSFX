@@ -9,23 +9,13 @@ const GROUPS: { title: string; keys: { k: string; label: string; hint?: string; 
       { k: 'OPENAI_BASE_URL', label: 'Base URL' },
       { k: 'OPENAI_API_KEY', label: 'API Key', secret: true },
       { k: 'MODEL_NAME', label: 'Model teks (manifest & picker)' },
-      { k: 'VLM_MODEL', label: 'Model vision (frame)', hint: 'wajib dukung gambar' },
+      { k: 'VLM_MODEL', label: 'Model analisis (video+audio)', hint: 'wajib dukung input video+audio — Gemini, GPT-4o, dll' },
       {
         k: 'LLM_FALLBACK_MODELS',
         label: 'Model cadangan (koma)',
         hint: 'dipakai otomatis kalau model utama gagal',
       },
       { k: 'EMBEDDING_MODEL', label: 'Model embedding lokal' },
-    ],
-  },
-  {
-    title: 'Transkripsi',
-    keys: [
-      { k: 'WHISPER_ONNX_MODEL', label: 'Whisper ONNX (model HF)', hint: 'tiny/small/medium…' },
-      { k: 'WHISPER_ONNX_DTYPE', label: 'Dtype q8/q3/f32' },
-      { k: 'WHISPER_LANGUAGE', label: 'Bahasa (id)', hint: 'transformers.js tidak auto-detect' },
-      { k: 'AUDIOCPP_SERVER', label: 'audio.cpp server' },
-      { k: 'AUDIOCPP_MODEL', label: 'audio.cpp model ASR', hint: 'harus terdaftar di server audio.cpp' },
     ],
   },
   {

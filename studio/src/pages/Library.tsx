@@ -167,8 +167,6 @@ export function Library() {
     }
   };
 
-  const sel = rows.find((r) => r.id === selected) ?? null;
-
   return (
     <div>
       <h1>Library SFX</h1>
@@ -205,37 +203,39 @@ export function Library() {
       <h2>{rows.length} SFX</h2>
       {rows.length === 0 && <div className="card muted">Belum ada SFX. Impor dulu di atas.</div>}
       {rows.map((r) => (
-        <div className="sfx-item" key={r.id}>
-          <div className="id">{r.id}</div>
-          <div>
-            <strong>{r.filename}</strong>{' '}
-            <span className="muted small mono">
-              {(r.duration_ms / 1000).toFixed(2)}s · onset {r.onset_ms}ms
-            </span>
-            <div className="muted small">{r.description || '— belum ada deskripsi —'}</div>
-            {r.tags && (
-              <div className="tags">
-                {r.tags
-                  .split(',')
-                  .filter(Boolean)
-                  .map((t, i) => (
-                    <span className="tag" key={i}>
-                      {t}
-                    </span>
-                  ))}
-              </div>
-            )}
+        <div key={r.id} className="sfx-block">
+          <div className={'sfx-item' + (selected === r.id ? ' active' : '')}>
+            <div className="id">{r.id}</div>
+            <div>
+              <strong>{r.filename}</strong>{' '}
+              <span className="muted small mono">
+                {(r.duration_ms / 1000).toFixed(2)}s · onset {r.onset_ms}ms
+              </span>
+              <div className="muted small">{r.description || '— belum ada deskripsi —'}</div>
+              {r.tags && (
+                <div className="tags">
+                  {r.tags
+                    .split(',')
+                    .filter(Boolean)
+                    .map((t, i) => (
+                      <span className="tag" key={i}>
+                        {t}
+                      </span>
+                    ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => setSelected(selected === r.id ? null : r.id)}>
+              {selected === r.id ? 'Tutup' : 'Edit'}
+            </button>
           </div>
-          <button onClick={() => setSelected(r.id)}>{selected === r.id ? 'Terbuka' : 'Edit'}</button>
+          {selected === r.id && (
+            <div className="edit-inline">
+              <Editor row={r} onSaved={refresh} onDeleted={() => { setSelected(null); void refresh(); }} />
+            </div>
+          )}
         </div>
       ))}
-
-      {sel && (
-        <>
-          <h2>Edit SFX #{sel.id}</h2>
-          <Editor row={sel} onSaved={refresh} onDeleted={() => { setSelected(null); void refresh(); }} />
-        </>
-      )}
     </div>
   );
 }

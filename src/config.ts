@@ -22,16 +22,12 @@ export interface Settings {
   OPENAI_BASE_URL: string;
   OPENAI_API_KEY: string;
   MODEL_NAME: string;
+  /** Wajib mendukung INPUT VIDEO+AUDIO (Gemini, GPT-4o, dll) — pipeline mengirim chunk mp4 base64, bukan gambar. */
   VLM_MODEL: string;
   /** Model cadangan dipakai berurutan kalau MODEL_NAME gagal (upstream error). */
   LLM_FALLBACK_MODELS: string;
   EMBEDDING_MODEL: string;
 
-  AUDIOCPP_SERVER: string;
-  AUDIOCPP_MODEL: string;
-  WHISPER_ONNX_MODEL: string;
-  WHISPER_ONNX_DTYPE: string;
-  WHISPER_LANGUAGE: string;
   SFX_MIN_GAP_SEC: string;
   SFX_MAX_PER_BEAT: string;
   RENDER_LEAD_MS: string;
@@ -44,11 +40,6 @@ export const SETTING_KEYS: (keyof Settings)[] = [
   'VLM_MODEL',
   'LLM_FALLBACK_MODELS',
   'EMBEDDING_MODEL',
-  'AUDIOCPP_SERVER',
-  'AUDIOCPP_MODEL',
-  'WHISPER_ONNX_MODEL',
-  'WHISPER_ONNX_DTYPE',
-  'WHISPER_LANGUAGE',
   'SFX_MIN_GAP_SEC',
   'SFX_MAX_PER_BEAT',
   'RENDER_LEAD_MS',
@@ -61,11 +52,6 @@ const DEFAULTS: Settings = {
   VLM_MODEL: 'gpt-4o-mini',
   LLM_FALLBACK_MODELS: 'space-bunny-alpha',
   EMBEDDING_MODEL: 'Xenova/paraphrase-multilingual-MiniLM-L12-v2',
-  AUDIOCPP_SERVER: 'http://localhost:8080',
-  AUDIOCPP_MODEL: 'whisper-large-v3',
-  WHISPER_ONNX_MODEL: 'onnx-community/whisper-medium_timestamped',
-  WHISPER_ONNX_DTYPE: 'q8',
-  WHISPER_LANGUAGE: 'id',
   SFX_MIN_GAP_SEC: '5',
   SFX_MAX_PER_BEAT: '1',
   RENDER_LEAD_MS: '-120',

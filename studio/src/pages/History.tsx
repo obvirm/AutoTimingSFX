@@ -26,7 +26,6 @@ export function History() {
               <tr>
                 <th>Status</th>
                 <th>Video</th>
-                <th>Engine</th>
                 <th>Prompt</th>
                 <th>Dibuat</th>
               </tr>
@@ -42,7 +41,6 @@ export function History() {
                     {j.video_name}
                     <div className="muted small mono">{j.id.slice(0, 8)}</div>
                   </td>
-                  <td className="mono small">{j.engine}</td>
                   <td className="muted small" style={{ maxWidth: 300 }}>
                     {j.prompt || '—'}
                   </td>

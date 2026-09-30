@@ -21,7 +21,6 @@ export interface JobRow {
   id: string;
   status: string;
   stage: string;
-  engine: string;
   video_name: string;
   video_path: string;
   prompt: string;
@@ -175,7 +174,6 @@ export function loadEmbeddings(kind: string): { refId: number; model: string; ve
 
 export function createJob(j: {
   id: string;
-  engine: string;
   video_name: string;
   video_path: string;
   prompt: string;
@@ -183,10 +181,10 @@ export function createJob(j: {
 }): void {
   getDb()
     .prepare(
-      `INSERT INTO jobs (id, status, stage, engine, video_name, video_path, prompt, options)
-       VALUES (?, 'queued', 'queued', ?, ?, ?, ?, ?)`
+      `INSERT INTO jobs (id, status, stage, video_name, video_path, prompt, options)
+       VALUES (?, 'queued', 'queued', ?, ?, ?, ?)`
     )
-    .run(j.id, j.engine, j.video_name, j.video_path, j.prompt, j.options);
+    .run(j.id, j.video_name, j.video_path, j.prompt, j.options);
 }
 
 export function getJob(id: string): JobRow | undefined {

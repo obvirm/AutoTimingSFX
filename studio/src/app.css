@@ -1,18 +1,18 @@
 :root {
-  --bg: #0a0910;
-  --bg2: #100e1a;
-  --panel: #15122297;
-  --panel-solid: #151222;
-  --line: #262238;
-  --line2: #35304d;
-  --text: #e9e6f4;
-  --muted: #8d87a6;
-  --purple: #a78bfa;
-  --purple-deep: #7c3aed;
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --panel2: #101010;
+  --line: #1c1c1c;
+  --line2: #2a2a2a;
+  --text: #f2f2f2;
+  --muted: #8a8a8a;
+  --purple: #a855f7;
+  --purple-bright: #b568ff;
   --red: #fb7185;
   --red-deep: #e11d48;
   --blue: #38bdf8;
   --green: #4ade80;
+  --lime: #b8f24d;
   --amber: #fbbf24;
   --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
 }
@@ -29,10 +29,7 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(1200px 500px at 80% -10%, #1e1533 0%, transparent 60%),
-    radial-gradient(900px 400px at -10% 110%, #101b2e 0%, transparent 55%),
-    var(--bg);
+  background: #000;
   color: var(--text);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
@@ -46,7 +43,7 @@ body {
 
 nav.side {
   border-right: 1px solid var(--line);
-  background: linear-gradient(180deg, #120f1e 0%, #0c0a14 100%);
+  background: #000;
   padding: 18px 12px;
   display: flex;
   flex-direction: column;
@@ -79,21 +76,21 @@ nav.side a {
   color: var(--muted);
   text-decoration: none;
   padding: 9px 12px;
-  border-radius: 8px;
+  border-radius: 999px;
   border: 1px solid transparent;
   display: block;
 }
 
 nav.side a:hover {
   color: var(--text);
-  background: #1a1730;
+  background: var(--panel2);
 }
 
 nav.side a.on {
-  color: #fff;
-  background: linear-gradient(90deg, #2a1f4d 0%, #1b1730 100%);
-  border-color: var(--line2);
-  box-shadow: inset 3px 0 0 var(--purple);
+  color: #000;
+  font-weight: 700;
+  background: var(--purple);
+  border-color: var(--purple);
 }
 
 nav.side .spacer {
@@ -134,9 +131,8 @@ h2 {
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 18px;
-  backdrop-filter: blur(6px);
 }
 
 .card + .card {
@@ -181,11 +177,11 @@ input[type='number'],
 textarea,
 select {
   width: 100%;
-  background: #0d0b16;
+  background: #000;
   border: 1px solid var(--line2);
   color: var(--text);
-  border-radius: 8px;
-  padding: 9px 11px;
+  border-radius: 10px;
+  padding: 9px 12px;
   font-family: inherit;
   font-size: 13.5px;
   outline: none;
@@ -194,8 +190,8 @@ select {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--purple-deep);
-  box-shadow: 0 0 0 3px #7c3aed33;
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px #a855f733;
 }
 
 textarea {
@@ -205,40 +201,50 @@ textarea {
 
 button,
 .btn {
-  background: linear-gradient(180deg, #241d3f 0%, #1a1730 100%);
+  background: var(--panel2);
   border: 1px solid var(--line2);
   color: var(--text);
-  border-radius: 8px;
-  padding: 9px 16px;
+  border-radius: 999px;
+  padding: 9px 18px;
   font-size: 13.5px;
   cursor: pointer;
   font-family: inherit;
+  text-decoration: none;
+  display: inline-block;
 }
 
 button:hover,
 .btn:hover {
-  border-color: var(--purple-deep);
+  border-color: var(--purple);
+  color: #fff;
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 button.primary {
-  background: linear-gradient(180deg, #7c3aed 0%, #5b21b6 100%);
-  border-color: #8b5cf6;
-  color: #fff;
-  font-weight: 600;
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #000;
+  font-weight: 700;
 }
 
 button.primary:hover {
-  box-shadow: 0 0 18px #7c3aed66;
+  background: var(--purple-bright);
+  border-color: var(--purple-bright);
+  box-shadow: 0 0 22px #a855f755;
 }
 
 button.danger {
-  background: linear-gradient(180deg, #e11d48 0%, #9f1239 100%);
+  background: transparent;
   border-color: var(--red-deep);
+  color: var(--red);
+}
+
+button.danger:hover {
+  background: var(--red-deep);
   color: #fff;
 }
 
@@ -247,14 +253,15 @@ button.ghost {
 }
 
 button.blue {
-  background: linear-gradient(180deg, #0284c7 0%, #075985 100%);
-  border-color: #0ea5e9;
-  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #000;
+  font-weight: 700;
 }
 
 .badge {
   display: inline-block;
-  padding: 2px 9px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -264,27 +271,27 @@ button.blue {
 }
 
 .badge.done {
-  background: #14351f;
+  background: #0c2916;
   color: var(--green);
   border: 1px solid #1f5c35;
 }
 
 .badge.running {
-  background: #12253a;
+  background: #062033;
   color: var(--blue);
-  border: 1px solid #1d4ed8;
+  border: 1px solid #0e5a86;
   animation: pulse 1.4s infinite;
 }
 
 .badge.error {
-  background: #3d1220;
+  background: #2d0d16;
   color: var(--red);
   border: 1px solid var(--red-deep);
 }
 
 .badge.queued,
 .badge.canceled {
-  background: #2a2438;
+  background: var(--panel2);
   color: var(--muted);
   border: 1px solid var(--line2);
 }
@@ -317,7 +324,7 @@ td {
 }
 
 tr:hover td {
-  background: #191530aa;
+  background: #0c0c0c;
 }
 
 .mono {
@@ -333,7 +340,7 @@ tr:hover td {
 }
 
 .log {
-  background: #07060d;
+  background: #000;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px;
@@ -353,11 +360,11 @@ tr:hover td {
 }
 
 .log .i {
-  color: #9d97b8;
+  color: #9a9a9a;
 }
 
 .errbox {
-  background: #2d0f1a;
+  background: #1a0a0f;
   border: 1px solid var(--red-deep);
   color: #fecdd3;
   border-radius: 10px;
@@ -369,7 +376,7 @@ tr:hover td {
 }
 
 .okbox {
-  background: #0d2418;
+  background: #0a1a10;
   border: 1px solid #1f5c35;
   color: #bbf7d0;
   border-radius: 10px;
@@ -378,20 +385,21 @@ tr:hover td {
 }
 
 .dropzone {
-  border: 2px dashed var(--line2);
-  border-radius: 12px;
+  border: 1.5px dashed var(--line2);
+  border-radius: 14px;
   padding: 34px 20px;
   text-align: center;
   color: var(--muted);
   cursor: pointer;
   transition: 0.15s;
+  background: var(--panel);
 }
 
 .dropzone:hover,
 .dropzone.over {
   border-color: var(--purple);
   color: var(--text);
-  background: #1a153380;
+  background: var(--panel2);
 }
 
 .stages {
@@ -404,23 +412,24 @@ tr:hover td {
 .stage {
   font-family: var(--mono);
   font-size: 11px;
-  padding: 5px 10px;
-  border-radius: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
   border: 1px solid var(--line2);
   color: var(--muted);
-  background: #0d0b16;
+  background: #000;
 }
 
 .stage.done {
   border-color: #1f5c35;
   color: var(--green);
-  background: #0f2019;
+  background: #0a1a10;
 }
 
 .stage.now {
-  border-color: var(--purple-deep);
-  color: var(--purple);
-  background: #1c1533;
+  border-color: var(--purple);
+  color: #000;
+  font-weight: 700;
+  background: var(--purple);
   animation: pulse 1.2s infinite;
 }
 
@@ -428,7 +437,7 @@ tr:hover td {
   width: 100%;
   height: 54px;
   display: block;
-  background: #0a0812;
+  background: #000;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -440,12 +449,21 @@ tr:hover td {
   align-items: center;
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #12101d;
+  border-radius: 12px;
+  background: var(--panel);
 }
 
-.sfx-item + .sfx-item {
+.sfx-item.active {
+  border-color: var(--purple);
+}
+
+.sfx-block + .sfx-block {
   margin-top: 10px;
+}
+
+.edit-inline {
+  margin-top: 10px;
+  margin-bottom: 6px;
 }
 
 .sfx-item .id {
@@ -463,11 +481,11 @@ tr:hover td {
 }
 
 .tag {
-  background: #241d3f;
-  border: 1px solid var(--line2);
-  color: var(--blue);
+  background: #140a1e;
+  border: 1px solid #3b1d5c;
+  color: var(--purple-bright);
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
   font-family: var(--mono);
 }
@@ -483,7 +501,7 @@ tr:hover td {
 .timeline {
   position: relative;
   height: 46px;
-  background: #0a0812;
+  background: #000;
   border: 1px solid var(--line2);
   border-radius: 8px;
   margin-top: 10px;
@@ -495,8 +513,8 @@ tr:hover td {
   top: 6px;
   bottom: 6px;
   width: 3px;
-  background: var(--red);
-  box-shadow: 0 0 8px var(--red);
+  background: var(--lime);
+  box-shadow: 0 0 8px var(--lime);
 }
 
 .timeline .mark::after {
@@ -506,14 +524,14 @@ tr:hover td {
   left: 6px;
   font-size: 10px;
   font-family: var(--mono);
-  color: var(--red);
+  color: var(--lime);
 }
 
 .timeline .ruler {
   position: absolute;
   inset: auto 0 0 0;
   height: 4px;
-  background: linear-gradient(90deg, var(--purple-deep), var(--blue));
+  background: var(--purple);
 }
 
 .foot-actions {
@@ -528,11 +546,15 @@ tr:hover td {
   font-size: 11px;
   color: var(--muted);
   border: 1px solid var(--line);
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: #0d0b16;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #000;
 }
 
 input.file {
   display: none;
+}
+
+audio {
+  filter: invert(0.92) hue-rotate(180deg);
 }

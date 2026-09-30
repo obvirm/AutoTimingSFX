@@ -5,7 +5,6 @@ export function NewJob() {
   const [file, setFile] = useState<File | null>(null);
   const [videoPath, setVideoPath] = useState('');
   const [prompt, setPrompt] = useState('');
-  const [engine, setEngine] = useState('onnx');
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('');
   const [err, setErr] = useState('');
@@ -36,7 +35,7 @@ export function NewJob() {
     setErr('');
     setPhase('menjalankan pipeline…');
     try {
-      const r = await api.run({ videoPath, prompt, engine });
+      const r = await api.run({ videoPath, prompt });
       location.hash = `#/jobs/${r.jobId}`;
     } catch (e) {
       setErr((e as Error).message);
@@ -49,7 +48,8 @@ export function NewJob() {
     <div>
       <h1>Job Baru</h1>
       <p className="sub">
-        Satu shot: video → transkrip (Whisper) → visual (VLM) → manifest beat → picker SFX (RAG) → render FFmpeg.
+        Satu shot: video → analisis VLM (video+audio, tanpa transkrip) → manifest beat → picker SFX (RAG) →
+        render FFmpeg.
       </p>
       {err && <div className="errbox">{err}</div>}
 
@@ -96,26 +96,19 @@ export function NewJob() {
         </label>
         <div className="grid3">
           <label className="f">
-            <span>Engine transkripsi</span>
-            <select value={engine} onChange={(e) => setEngine(e.target.value)}>
-              <option value="onnx">Whisper ONNX (lokal, default)</option>
-              <option value="audiocpp">audio.cpp (:8080 — butuh model ASR terdaftar)</option>
-            </select>
+            <span>VLM analisis</span>
+            <input type="text" disabled value="model di Pengaturan — wajib dukung video+audio" />
           </label>
           <label className="f">
             <span>Keypadatan SFX</span>
             <input type="text" disabled value="diatur global di Pengaturan (min gap / max per beat)" />
-          </label>
-          <label className="f">
-            <span>Bahasa transkrip</span>
-            <input type="text" disabled value="id (WHISPER_LANGUAGE, di Pengaturan)" />
           </label>
         </div>
         <div className="foot-actions">
           <button className="primary" disabled={!videoPath || busy} onClick={start}>
             {busy ? phase || 'Bekerja…' : 'Jalankan pipeline →'}
           </button>
-          <span className="muted small">Estimasi: transkrip lokal + VLM + render tergantung panjang video.</span>
+          <span className="muted small">Estimasi: analisis VLM per segmen 40 dtk + render, tergantung panjang video.</span>
         </div>
       </div>
     </div>

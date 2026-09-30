@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TMP_DIR } from './config.js';
 
 export function runFfmpeg(args: string[], timeoutMs = 600_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -54,13 +53,6 @@ export function runFfprobe(file: string): Promise<any> {
 export async function probeDuration(file: string): Promise<number> {
   const j = await runFfprobe(file);
   return Number(j?.format?.duration ?? 0);
-}
-
-/** Ekstrak audio → WAV mono 16kHz (untuk whisper). */
-export async function extractAudioWav(video: string): Promise<string> {
-  const out = path.join(TMP_DIR, `audio_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.wav`);
-  await runFfmpeg(['-i', video, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'pcm_s16le', out]);
-  return out;
 }
 
 /** Baca WAV PCM16 mono menjadi Float32Array (sample rate diembalikan). */
@@ -170,21 +162,20 @@ export async function analyzeSfx(file: string): Promise<SfxAnalysis> {
   return { duration_ms: dur, lufs: Math.round(lufs * 10) / 10, onset_ms: onsetMs, peak_db: Math.round(peakDb * 10) / 10 };
 }
 
-/** Ambil frame kunci dari video untuk VLM. */
-export async function extractFrames(video: string, jobDir: string, durationSec: number): Promise<{ file: string; t: number }[]> {
-  const framesDir = path.join(jobDir, 'frames');
-  fs.mkdirSync(framesDir, { recursive: true });
-  const target = Math.min(40, Math.max(8, Math.ceil(durationSec / 4)));
-  const fps = target / Math.max(durationSec, 1);
+/** Potong segmen video (dengan audio) → mp4 utuh untuk dikirim ke VLM. */
+export async function extractVideoChunk(video: string, startSec: number, durSec: number, outFile: string): Promise<void> {
   await runFfmpeg([
+    '-ss', startSec.toFixed(3),
+    '-t', durSec.toFixed(3),
     '-i', video,
-    '-vf', `fps=${fps.toFixed(6)},scale=640:-2`,
-    '-q:v', '5',
-    path.join(framesDir, 'f_%04d.jpg'),
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '26',
+    '-c:a', 'aac',
+    '-movflags', '+faststart',
+    outFile,
   ]);
-  const files = fs.readdirSync(framesDir).filter((f) => f.endsWith('.jpg')).sort();
-  return files.map((f, i) => ({
-    file: path.join(framesDir, f),
-    t: Math.round(((i + 0.5) / fps) * 10) / 10,
-  }));
+  if (!fs.existsSync(outFile) || fs.statSync(outFile).size === 0) {
+    throw new Error(`chunk video gagal dibuat: ${outFile}`);
+  }
 }

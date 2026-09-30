@@ -43,7 +43,6 @@ export interface JobSummary {
   id: string;
   status: string;
   stage: string;
-  engine: string;
   video_name: string;
   prompt: string;
   created_at: string;

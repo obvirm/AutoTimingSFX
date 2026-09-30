@@ -4,9 +4,7 @@ import type { Cue, JobDetail, SfxRow } from '../types';
 
 const STAGES = [
   ['probe', 'probe'],
-  ['extract-audio', 'ekstrak audio'],
-  ['transcribe', 'transkrip'],
-  ['visual', 'visual'],
+  ['analyze', 'analisis VLM'],
   ['manifest', 'manifest'],
   ['pick', 'picker'],
   ['render', 'render'],
@@ -225,7 +223,6 @@ export function JobDetailPage({ id }: { id: string }) {
         <h1 style={{ marginBottom: 0 }}>Job {job.id.slice(0, 8)}</h1>
         <div className="row">
           <span className={'badge ' + (running ? 'running' : job.status)}>{job.status}</span>
-          <span className="pill">engine: {job.engine}</span>
           {running && (
             <button
               className="danger ghost"
@@ -287,14 +284,14 @@ export function JobDetailPage({ id }: { id: string }) {
           </div>
         )}
         <div className="foot-actions">
-          <a className="btn" href={api.artifactUrl(job.id, 'transcript.json')} download>
-            transcript.json
+          <a className="btn" href={api.artifactUrl(job.id, 'events.json')} download>
+            events.json
           </a>
           <a className="btn" href={api.artifactUrl(job.id, 'manifest.json')} download>
             manifest.json
           </a>
-          <a className="btn" href={api.artifactUrl(job.id, 'visual.json')} download>
-            visual.json
+          <a className="btn" href={api.artifactUrl(job.id, 'cue_list.json')} download>
+            cue_list.json
           </a>
         </div>
       </div>

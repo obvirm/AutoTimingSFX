@@ -53,14 +53,14 @@ const srv = await new Promise<any>((resolve) => {
 const port = (srv.address() as any).port;
 const base = `http://localhost:${port}`;
 
-const j1 = await (await fetch(`${base}/api/sfx`)).json();
+const j1: any = await (await fetch(`${base}/api/sfx`)).json();
 console.log('GET /api/sfx OK:', j1.length, 'rows');
 if (!j1.some((r: any) => r.id === a.id) || !j1.some((r: any) => r.id === b.id)) throw new Error('import tidak muncul di list');
 
-const j2 = await (await fetch(`${base}/api/sfx/search?q=karet`)).json();
+const j2: any = await (await fetch(`${base}/api/sfx/search?q=karet`)).json();
 console.log('GET /api/sfx/search OK:', j2.length, 'hits');
 
-// upload video dummy → job invalid path ditolak dengan benar
+// upload video dummy → path valid tersimpan di disk
 const up = await fetch(`${base}/api/upload?name=tone.mp4`, {
   method: 'POST',
   body: fs.readFileSync(fixture1),
@@ -69,34 +69,55 @@ const upJ: any = await up.json();
 console.log('upload OK:', upJ.videoPath);
 if (!fs.existsSync(upJ.videoPath)) throw new Error('upload tidak tersimpan');
 
+// path tidak ada → ditolak 400
+const runBad = await fetch(`${base}/api/run`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ videoPath: 'E:/tidak/ada/video.mp4' }),
+});
+if (runBad.status !== 400) throw new Error(`harapnya 400, dapat ${runBad.status}`);
+console.log('run path invalid → 400 OK');
+
+// file bukan video → job dibuat lalu gagal rapi di tahap probe (error handling teruji)
+const upBroken = await fetch(`${base}/api/upload?name=broken.mp4`, {
+  method: 'POST',
+  body: Buffer.from('ini bukan file video sama sekali'),
+});
+const upBrokenJ: any = await upBroken.json();
 const run = await fetch(`${base}/api/run`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ videoPath: upJ.videoPath, engine: 'audiocpp' }),
+  body: JSON.stringify({ videoPath: upBrokenJ.videoPath }),
 });
 const runJ: any = await run.json();
 console.log('run OK:', runJ.jobId);
 const job = getJob(runJ.jobId);
 console.log('job row:', job?.status, job?.stage);
 
-// audio.cpp tidak jalan → job harus gagal rapi di stage transcribe (error handling teruji)
-await new Promise((r) => setTimeout(r, 8000));
-const after = getJob(runJ.jobId);
-console.log('job setelah 3s:', after?.status, after?.stage, after?.error.slice(0, 120));
+let after = getJob(runJ.jobId);
+const t0 = Date.now();
+while (after?.status === 'queued' || after?.status === 'running') {
+  if (Date.now() - t0 > 30_000) break;
+  await new Promise((r) => setTimeout(r, 1000));
+  after = getJob(runJ.jobId);
+}
+console.log('job akhir:', after?.status, after?.stage, (after?.error || '').slice(0, 120));
+if (after?.status !== 'error') throw new Error('harapnya job error rapi, dapat ' + after?.status);
 
-const jobsList = await (await fetch(`${base}/api/jobs`)).json();
+const jobsList: any = await (await fetch(`${base}/api/jobs`)).json();
 console.log('GET /api/jobs OK:', jobsList.length);
 
 const set = await fetch(`${base}/api/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ SFX_MIN_GAP_SEC: '5' }) });
-console.log('settings PUT OK:', (await set.json()).ok);
+console.log('settings PUT OK:', ((await set.json()) as any).ok);
 
 await new Promise((r) => srv.close(r));
 
 // bersihkan fixture supaya library user tidak tercemar file test
 removeSfx(a.id);
 removeSfx(b.id);
-try { fs.unlinkSync(upJ.videoPath); } catch { /* ignore */ }
-for (const f of [fixture1, fixture2]) { try { fs.unlinkSync(f); } catch { /* ignore */ } }
+for (const f of [upJ.videoPath, upBrokenJ.videoPath, fixture1, fixture2]) {
+  try { fs.unlinkSync(f); } catch { /* ignore */ }
+}
 console.log('cleanup OK, sisa rows:', listSfx().length);
 console.log('SMOKE TEST LULUS ✓');
 process.exit(0);

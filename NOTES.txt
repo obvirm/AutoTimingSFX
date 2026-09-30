@@ -210,3 +210,36 @@ GATEWAY 9ROUTER (update — keputusan user)
 - E2E ulang setelah pindah gateway: LULUS (25 kata, 4 momen, 8 beat, 2 cue,
   final.mp4 6.4s).
 
+REFACTOR BESAR — BUANG TRANKRIP LOKAL (keputusan user, 30/09/2026)
+--------------------------------------------------------------------
+- Keputusan user: hapus SEMUA jalur transkripsi lokal (Whisper ONNX +
+  audio.cpp ASR) dari kode, API, dan UI — bukan sekadar disembunyikan.
+- Alasan: timing beat diambil dari TIMESTAMP VLM (±0,5 dtk cukup —
+  presisi halus diatur via editor cue), dan gateway 9router +
+  ag/gemini-3.6-flash-high terbukti menerima data:video/mp4;base64 di
+  slot image_url dan MENDENGAR audio di dalamnya (uji:
+  E:\temp\opencode\test_video.cjs → model mendeskripsikan sine 440Hz).
+- Arsitektur baru: probe → analyze (video dipotong per 40 detik, AUDIO
+  IKUT, tiap segmen → VLM → momen timestamp GLOBAL → events.json) →
+  manifest → pick → render. Tahap extract-audio/transcribe dihapus.
+- SYARAT KERAS dicatat di kode (JSDoc VLM_MODEL di src/config.ts) dan
+  README: VLM_MODEL WAJIB mendukung input video+audio (kelas Gemini /
+  GPT-4o). Model yang hanya menerima gambar-still = gagal/buta suara.
+- Masih tetap produk: analisis audio SFX saat import (durasi/LUFS/
+  onset via ffmpeg) — itu BUKAN transkripsi, jangan dihapus.
+- Dihapus: src/transcribe/, chatVision/extractFrames/extractAudioWav,
+  wordsToSegments/wordsNear/normalizeWords, setelan WHISPER_* &
+  AUDIOCPP_* (Settings, SETTING_KEYS, .env.example), engine di /api/run
+  + UI (select engine, bahasa transkrip, grup "Transkripsi", pill
+  engine, kolom Engine di Riwayat).
+- Artifact per job kini: events.json, manifest.json, cue_list.json,
+  final.mp4 (transcript.json & visual.json tidak ada lagi). Stage UI:
+  probe → analisis VLM → manifest → picker → render.
+- Tests: 23 LULUS (chunkRanges menggantikan wordsToSegments;
+  normalizeWords dibuang). Smoke: kegagalan job diuji via file bukan-
+  video (probe gagal rapi) + /api/run path invalid → 400.
+- E2E: video fixture ffmpeg 4 adegan warna + beep di tiap potongan
+  (tanpa TTS audio.cpp); verifikasi events/manifest/cues/final.mp4.
+- Referensi movie2short: mode default-nya juga chunk 40 detik tanpa
+  whisper di tahap analisis (server.mjs:344-349, analyzer.ts:41).
+

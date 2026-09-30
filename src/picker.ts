@@ -3,7 +3,6 @@ import { getSfx } from './db.js';
 import type { Beat } from './manifest.js';
 import { chatJson } from './openai.js';
 import { allSfxWithText, searchSfx } from './sfx.js';
-import type { Word } from './transcribe/audiocpp.js';
 import { clamp } from './util.js';
 
 export type CueType = 'impact' | 'voice' | 'ambience' | 'stinger';
@@ -30,22 +29,17 @@ interface RawCue {
   reason?: string;
 }
 
-function wordsNear(words: Word[], t: number, span = 2.5): Word[] {
-  return words.filter((w) => w.start >= t - span && w.start <= t + span).slice(0, 24);
-}
-
 /**
  * Picker RAG: untuk tiap beat → kandidat SFX (embedding/semantik) → LLM memilih
  * + menentukan anchor & lead → validasi kepadatan → cue list final.
  */
 export async function pickSfx(opts: {
   beats: Beat[];
-  words: Word[];
   userPrompt: string;
   durationSec: number;
   log: (m: string) => void;
 }): Promise<Cue[]> {
-  const { beats, words, userPrompt, durationSec, log } = opts;
+  const { beats, userPrompt, durationSec, log } = opts;
   const s = getSettings();
   const minGap = Number(s.SFX_MIN_GAP_SEC || 5);
   const maxPerBeat = Number(s.SFX_MAX_PER_BEAT || 1);
@@ -73,19 +67,15 @@ export async function pickSfx(opts: {
     .join('\n');
 
   const beatsBrief = beats
-    .map((b, i) => {
-      const near = wordsNear(words, (b.t + b.end) / 2)
-        .map((w) => `"${w.w}"@${w.start.toFixed(2)}s`)
-        .join(' ');
-      return [
+    .map((b, i) =>
+      [
         `Beat ${i}: t=${b.t}s..${b.end}s type=${b.type}`,
         `  konteks: ${b.context}`,
         `  catatan: ${b.notes}`,
-        near ? `  kata terdekat: ${near}` : '',
       ]
         .filter(Boolean)
-        .join('\n');
-    })
+        .join('\n')
+    )
     .join('\n');
 
   const sys = [
@@ -97,7 +87,7 @@ export async function pickSfx(opts: {
     '   "voice" = SFX berbunyi manusia/hewan (mis. "aduh tunggu") → leadMs 0, harus jatuh tepat di anchor;',
     '   "stinger" = musik/jingle pendek penekan → leadMs -50;',
     '   "ambience" = suasana latar → leadMs 0, mulai di awal beat, gain rendah (-18 s/d -30 dB).',
-    '4. anchorT = detik MASEWAH momen (boleh di dalam rentang beat, snap ke kata terdekat bila ada),',
+    '4. anchorT = detik MASUK akal momen (di dalam rentang beat, tepat di titik momen bila memungkinkan),',
     '   leadMs = kapan SUARA MULAI relatif terhadap anchor (negatif = lebih awal).',
     '5. gainDb umumnya -18..0 dB (dialogue padat → lebih rendah).',
     '6. reason: 1 kalimat bahasa Indonesia, kenapa SFX ini cocok (audit-able).',

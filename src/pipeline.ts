@@ -8,12 +8,11 @@ import {
   saveJobData,
   updateJob,
 } from './db.js';
-import { extractAudioWav, probeDuration } from './ffmpeg.js';
+import { probeDuration } from './ffmpeg.js';
 import { buildManifest } from './manifest.js';
 import { pickSfx, type Cue } from './picker.js';
 import { renderVideo } from './render.js';
-import { transcribe, type Engine } from './transcribe/index.js';
-import { analyzeVisual } from './visual.js';
+import { analyzeVideo } from './visual.js';
 
 const canceled = new Set<string>();
 
@@ -39,45 +38,30 @@ function checkCancel(jobId: string): void {
   }
 }
 
-/** Pipeline one-shot: transcribe → visual → manifest → pick → render. */
+/** Pipeline one-shot: analisis video+audio (VLM) → manifest → pick → render. */
 export async function runJob(jobId: string): Promise<void> {
   const job = getJob(jobId);
   if (!job) throw new Error('job tidak ditemukan');
-  const opts = JSON.parse(job.options || '{}') as { engine?: Engine };
-  const engine: Engine = opts.engine === 'audiocpp' ? 'audiocpp' : 'onnx';
   const dir = jobDir(jobId);
   fs.mkdirSync(dir, { recursive: true });
 
   try {
     updateJob(jobId, { status: 'running', stage: 'probe' });
-    log(jobId, `mulai (engine=${engine})`);
+    log(jobId, 'mulai');
     const durationSec = await probeDuration(job.video_path);
+    if (!Number.isFinite(durationSec) || durationSec <= 0) throw new Error('video tidak valid — ffprobe gagal baca durasi');
     saveJobData(jobId, { durationSec });
 
     checkCancel(jobId);
-    updateJob(jobId, { stage: 'extract-audio' });
-    log(jobId, 'ekstrak audio...');
-    const wav = await extractAudioWav(job.video_path);
-    fs.copyFileSync(wav, path.join(dir, 'audio.wav'));
-
-    checkCancel(jobId);
-    updateJob(jobId, { stage: 'transcribe' });
-    log(jobId, `transkripsi via ${engine}...`);
-    const words = await transcribe(engine, wav);
-    fs.writeFileSync(path.join(dir, 'transcript.json'), JSON.stringify(words, null, 2));
-    saveJobData(jobId, { wordCount: words.length });
-    log(jobId, `transkrip: ${words.length} kata`);
-
-    checkCancel(jobId);
-    updateJob(jobId, { stage: 'visual' });
-    const visual = await analyzeVisual(job.video_path, dir, durationSec, (m) => log(jobId, m));
-    fs.writeFileSync(path.join(dir, 'visual.json'), JSON.stringify(visual, null, 2));
+    updateJob(jobId, { stage: 'analyze' });
+    const events = await analyzeVideo(job.video_path, dir, durationSec, (m) => log(jobId, m));
+    fs.writeFileSync(path.join(dir, 'events.json'), JSON.stringify(events, null, 2));
+    saveJobData(jobId, { eventCount: events.length });
 
     checkCancel(jobId);
     updateJob(jobId, { stage: 'manifest' });
     const beats = await buildManifest({
-      words,
-      visual,
+      events,
       durationSec,
       userPrompt: job.prompt,
       log: (m) => log(jobId, m),
@@ -88,7 +72,6 @@ export async function runJob(jobId: string): Promise<void> {
     updateJob(jobId, { stage: 'pick' });
     let cues = await pickSfx({
       beats,
-      words,
       userPrompt: job.prompt,
       durationSec,
       log: (m) => log(jobId, m),
