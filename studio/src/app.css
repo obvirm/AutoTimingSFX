@@ -384,6 +384,20 @@ tr:hover td {
   margin: 12px 0;
 }
 
+.warnhint {
+  color: var(--amber);
+  line-height: 1.5;
+}
+
+.f input.warn {
+  border-color: var(--amber);
+}
+
+.f input.warn:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px #fbbf2433;
+}
+
 .dropzone {
   border: 1.5px dashed var(--line2);
   border-radius: 14px;
