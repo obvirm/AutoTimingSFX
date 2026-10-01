@@ -9,6 +9,8 @@ import {
   updateJob,
 } from './db.js';
 import { probeDuration } from './ffmpeg.js';
+import type { FxCue } from './fx-catalog.js';
+import { planFx } from './fx.js';
 import { buildManifest } from './manifest.js';
 import { pickSfx, type Cue } from './picker.js';
 import { renderVideo } from './render.js';
@@ -38,7 +40,7 @@ function checkCancel(jobId: string): void {
   }
 }
 
-/** Pipeline one-shot: analisis video+audio (VLM) → manifest → pick → render. */
+/** Pipeline one-shot: analisis video+audio (VLM) → manifest → pick → fx → render. */
 export async function runJob(jobId: string): Promise<void> {
   const job = getJob(jobId);
   if (!job) throw new Error('job tidak ditemukan');
@@ -77,13 +79,29 @@ export async function runJob(jobId: string): Promise<void> {
       log: (m) => log(jobId, m),
     });
     cues = resolveCueFiles(cues);
-    fs.writeFileSync(path.join(dir, 'cue_list.json'), JSON.stringify({ cues }, null, 2));
     saveJobData(jobId, { cueCount: cues.length });
 
     checkCancel(jobId);
+    updateJob(jobId, { stage: 'fx' });
+    const fx: FxCue[] =
+      process.env.FX_DISABLED === '1'
+        ? []
+        : await planFx({
+            beats,
+            durationSec,
+            userPrompt: job.prompt,
+            log: (m) => log(jobId, m),
+          });
+    fs.writeFileSync(path.join(dir, 'cue_list.json'), JSON.stringify({ cues, fx }, null, 2));
+    saveJobData(jobId, { fxCount: fx.length });
+
+    checkCancel(jobId);
     updateJob(jobId, { stage: 'render' });
-    log(jobId, `render ${cues.length} cue...`);
-    await renderVideo({ video: job.video_path, cues, durationSec }, path.join(dir, 'final.mp4'));
+    log(jobId, `render ${cues.length} cue, ${fx.length} efek...`);
+    await renderVideo(
+      { video: job.video_path, cues, fx, durationSec, jobDir: dir, log: (m) => log(jobId, m) },
+      path.join(dir, 'final.mp4')
+    );
     log(jobId, 'selesai ✓');
 
     updateJob(jobId, { status: 'done', stage: 'done', error: '' });
@@ -116,12 +134,23 @@ export async function rerenderJob(jobId: string, newCues: Cue[]): Promise<void> 
   const durationSec = Number(JSON.parse(job.data || '{}').durationSec || 0);
   if (!durationSec) throw new Error('durationSec belum ada — jalankan pipeline dulu');
   const cues = resolveCueFiles(newCues).map((c, i) => ({ ...c, id: c.id || `r${i + 1}` }));
+  // efek (fx) ikut dipertahankan dari cue_list sebelumnya
+  let fx: FxCue[] = [];
+  try {
+    const prev = JSON.parse(fs.readFileSync(path.join(dir, 'cue_list.json'), 'utf8'));
+    if (Array.isArray(prev?.fx)) fx = prev.fx as FxCue[];
+  } catch {
+    /* cue_list lama tanpa fx */
+  }
   updateJob(jobId, { stage: 'render', status: 'running', error: '' });
   try {
-    fs.writeFileSync(path.join(dir, 'cue_list.json'), JSON.stringify({ cues }, null, 2));
-    saveJobData(jobId, { cueCount: cues.length });
-    log(jobId, `re-render ${cues.length} cue (edit manual)...`);
-    await renderVideo({ video: job.video_path, cues, durationSec }, path.join(dir, 'final.mp4'));
+    fs.writeFileSync(path.join(dir, 'cue_list.json'), JSON.stringify({ cues, fx }, null, 2));
+    saveJobData(jobId, { cueCount: cues.length, fxCount: fx.length });
+    log(jobId, `re-render ${cues.length} cue + ${fx.length} efek (edit manual)...`);
+    await renderVideo(
+      { video: job.video_path, cues, fx, durationSec, jobDir: dir, log: (m) => log(jobId, m) },
+      path.join(dir, 'final.mp4')
+    );
     log(jobId, 're-render selesai ✓');
     updateJob(jobId, { status: 'done', stage: 'done' });
   } catch (e) {

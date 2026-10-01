@@ -243,3 +243,40 @@ REFACTOR BESAR — BUANG TRANKRIP LOKAL (keputusan user, 30/09/2026)
 - Referensi movie2short: mode default-nya juga chunk 40 detik tanpa
   whisper di tahap analisis (server.mjs:344-349, analyzer.ts:41).
 
+
+FX ENGINE (sidecar fx-renderer, fframes + Skia) - 2026-10-01
+------------------------------------------------------------
+- Design 1 FULL RE-RENDER: sidecar render footage + vfx -> video_fx.mp4
+  senyap, FFmpeg mux -c:v copy + graph audio. AudioMap::none() di sidecar;
+  encoder libx264 crf 18 preset fast (jangan tune=animation - merusak
+  footage asli). Tanpa vfx → render pakai footage asli, tanpa sidecar.
+- clap gotcha (KERAS): argumen wajib + global=true di fframes CLI GAGAL di
+  KEDUA posisi. --spec/--video harus argumen root non-global, ditaruh SEBELUM
+  subcommand: fx-renderer --spec X --video Y render -o out. TS sudah urut ini.
+- generated.rs (WIDTH/HEIGHT/FPS) ditulis pipeline PER JOB lalu cargo build
+  --release (incremental ~17 dtk). Default repo 1920x1080@30; nilai lama
+  1280x720 pernah tertinggal - kalau ganti video besar, biarkan pipeline
+  yang tulis, jangan edit manual (header harus persis template di fxruntime).
+- Media: JANGAN pakai MediaDirectory::read_folder (decode audio file lain).
+  main.rs bangun DynamicMediaProvider + VideoMedia {path, metadata:None}
+  manual (field pub) digabung static font via CombinedMediaProvider::from.
+- Hanya SATU vfx cue aktif kapan pun (validator: tanpa tumpang-tindih) →
+  render_frame pakai match arm tunggal; tak dikenal → base polos.
+- svgr! dynamic children TERBUKTI jalan: {expr.collect::<Svgr>()}, filter
+  (feColorMatrix/GaussianBlur/Offset/Blend), clipPath, pattern, image,
+  radialGradient semua didukung usvgr/skia. Duration::Seconds(f32);
+  scale-tengah = translate(c*(1-s)) + scale=s.
+- afx: aecho TIDAK punya param enable → cabang branch-gate:
+  asplit → aecho → volume=-1 → amix balik → volume=-1:enable='between…'
+  :eval=frame → afade halus. Trik ±volume terverifikasi volumedetect:
+  dalam jendela -20.3 dB (tap aktif), luar -21.1 dB (murni). Koma filter
+  escape \\,. Multi-tap config per efek ada di buildFilterGraph.
+- Guard: maks 1 vfx + 1 afx per beat, tidak overlap antar cue, FX_MAX_VFX=12
+  /FX_MAX_AFX=6 (6/3 jika video >120 dtk). Katalog: src/fx-catalog.ts
+  (13 vfx + 2 afx), picks di cue_list.json {cues, fx}, spec: fx_spec.json.
+- Temp file: FX_TMP (default D:\tmp) + fallback env.temp_dir(); C: cuma
+  0.2GB. Cargo/target: D:\cargo-home + D:\fx-target. Semua bisa dioverride
+  via FX_* (lihat src/fxruntime.ts + .env.example).
+- Verifikasi: unit cargo test 5/5; frame extraction grayscale/zoom/glitch/
+  text/speedlines OK; e2e penuh OK (4 vfx dari LLM → build 17.9s → render
+  1.3s → final.mp4 12.0s, frame speedlines+glitch terkonfirmasi visual).

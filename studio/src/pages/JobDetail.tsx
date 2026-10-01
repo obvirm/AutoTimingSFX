@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { Cue, JobDetail, SfxRow } from '../types';
+import type { Cue, FxCue, JobDetail, SfxRow } from '../types';
 
 const STAGES = [
   ['probe', 'probe'],
   ['analyze', 'analisis VLM'],
   ['manifest', 'manifest'],
   ['pick', 'picker'],
+  ['fx', 'efek'],
   ['render', 'render'],
   ['done', 'selesai'],
 ] as const;
@@ -168,6 +169,7 @@ function CueEditor({
 export function JobDetailPage({ id }: { id: string }) {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [cues, setCues] = useState<Cue[]>([]);
+  const [fx, setFx] = useState<FxCue[]>([]);
   const [sfxRows, setSfxRows] = useState<SfxRow[]>([]);
   const [err, setErr] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
@@ -180,7 +182,11 @@ export function JobDetailPage({ id }: { id: string }) {
       if (j.status === 'done' || typeof j.data?.cueCount === 'number') {
         try {
           const r = await fetch(api.artifactUrl(id, 'cue_list.json'));
-          if (r.ok) setCues(((await r.json()) as { cues: Cue[] }).cues ?? []);
+          if (r.ok) {
+            const j = (await r.json()) as { cues: Cue[]; fx?: FxCue[] };
+            setCues(j.cues ?? []);
+            setFx(j.fx ?? []);
+          }
         } catch {
           /* cue_list belum ada */
         }
@@ -267,18 +273,29 @@ export function JobDetailPage({ id }: { id: string }) {
         ) : (
           <p className="muted">{running ? 'Masih diproses… video muncul setelah selesai.' : 'Tidak ada hasil (job gagal/dibatalkan).'}</p>
         )}
-        {cues.length > 0 && (
+        {(cues.length > 0 || fx.length > 0) && (
           <div className="timeline">
             {(() => {
-              const span = Math.max(6, ...cues.map((c) => c.start)) * 1.15;
-              return cues.map((c, i) => (
-                <span
-                  key={i}
-                  className="mark"
-                  data-t={`${c.start.toFixed(2)}s`}
-                  style={{ left: `${Math.min(97, (c.start / span) * 100)}%` }}
-                />
-              ));
+              const span = Math.max(6, ...cues.map((c) => c.start), ...fx.map((f) => f.start)) * 1.15;
+              return [
+                ...cues.map((c, i) => (
+                  <span
+                    key={`c${i}`}
+                    className="mark"
+                    data-t={`${c.start.toFixed(2)}s`}
+                    style={{ left: `${Math.min(97, (c.start / span) * 100)}%` }}
+                  />
+                )),
+                ...fx.map((f, i) => (
+                  <span
+                    key={`f${i}`}
+                    className="mark"
+                    data-t={f.effect}
+                    title={`${f.kind} ${f.start.toFixed(2)}-${f.end.toFixed(2)}s`}
+                    style={{ left: `${Math.min(97, (f.start / span) * 100)}%`, opacity: 0.55 }}
+                  />
+                )),
+              ];
             })()}
             <span className="ruler" />
           </div>
@@ -295,6 +312,53 @@ export function JobDetailPage({ id }: { id: string }) {
           </a>
         </div>
       </div>
+
+      {fx.length > 0 && (
+        <>
+          <h2>Efek ({fx.length})</h2>
+          <div className="card">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>jenis</th>
+                  <th>efek</th>
+                  <th>waktu</th>
+                  <th>intensitas</th>
+                  <th>teks/warna</th>
+                  <th>alasan LLM</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fx.map((f, i) => (
+                  <tr key={f.id || i}>
+                    <td className="mono">{i + 1}</td>
+                    <td>
+                      <span className={'badge ' + f.kind}>{f.kind}</span>
+                    </td>
+                    <td className="mono">{f.effect}</td>
+                    <td className="mono">
+                      {f.start.toFixed(2)}–{f.end.toFixed(2)}s
+                    </td>
+                    <td className="mono">{f.intensity.toFixed(2)}</td>
+                    <td className="small">
+                      {f.text ? `“${f.text}” ` : ''}
+                      {f.color || ''}
+                    </td>
+                    <td className="muted small" style={{ maxWidth: 320 }}>
+                      {f.reason}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted small">
+              vfx di-render oleh sidecar fframes di atas footage asli; afx (echo/reverb) difilter FFmpeg pada
+              dialog. Waktu efek dipertahankan saat re-render SFX.
+            </p>
+          </div>
+        </>
+      )}
 
       {cues.length > 0 && (
         <>

@@ -13,6 +13,9 @@ diedit (cue list) lalu di-re-render tanpa mengulang pipeline.
 - Node.js ≥ 20 (dites di v25)
 - FFmpeg di PATH (detes di 8.1.2)
 - Model embedding (otomatis diunduh sekali dari HuggingFace)
+- **FX (opsional)**: Rust toolchain + LLVM 18 + FFmpeg shared build untuk
+  sidecar `fx-renderer` (build otomatis saat stage fx pertama kali jalan;
+  set `FX_DISABLED=1` kalau mau pipeline tanpa efek)
 
 ## Menjalankan
 
@@ -67,8 +70,16 @@ Catatan gateway 9router:
    validasi kepadatan: `SFX_MIN_GAP_SEC` (default 5 dtk), `SFX_MAX_PER_BEAT` (1),
    impact ditempatkan `RENDER_LEAD_MS` (−120 ms) sebelum momen (precedence
    manusia), dikoreksi `onset_ms` hasil analisis audio.
-5. `render` — filter_complex: dialog `asplit` → sidechain auto-duck, tiap SFX
-   `adelay`+`volume`, bus `amix normalize=0` → `apad/atrim` → campur final.
+5. `fx` — LLM merencanakan efek dari beat + prompt (katalog `src/fx-catalog.ts`):
+   vfx (grayscale, glitch, zoom, speedlines, text_pop, …) + afx (echo, reverb),
+   maks 1 vfx + 1 afx per beat, tidak boleh tumpang-tindih, dibatasi
+   `FX_MAX_VFX`/`FX_MAX_AFX` → `fx_spec.json` + `cue_list.json: {cues, fx}`.
+   Lewati dengan `FX_DISABLED=1`.
+6. `render` — **video**: sidecar `fx-renderer` (Rust, fframes+Skia GPU) me-render
+   footage + vfx → `video_fx.mp4` (senyap, `-c:v copy` saat mux); tanpa vfx
+   pakai footage asli. **audio**: filter_complex: dialog `asplit` → sidechain
+   auto-duck, tiap SFX `adelay`+`volume`, bus `amix normalize=0` → afx gate
+   (`volume=-1:enable='between…'`, terverifikasi) → `apad/atrim` → campur final.
 
 Semua cue punya `reason` yang bisa dicek di UI; `cue_list.json` tersimpan per
 job dan bisa diedit lalu di-re-render.
@@ -76,6 +87,28 @@ job dan bisa diedit lalu di-re-render.
 **Tidak ada transkripsi lokal lagi.** Whisper ONNX & audio.cpp dihapus dari
 jalur produk (2026-09-30): timing beat berasal dari timestamp VLM (akurasi
 ±0,5 dtk wajar — presisi halus diatur manual via editor cue).
+
+## FX engine (fx-renderer)
+
+Arsitektur **full re-render** (Design 1): sidecar Rust me-render ulang footage
+dengan efek visual di atasnya, FFmpeg tinggal mux video `-c:v copy` + graph
+audio. Alur per job:
+
+1. `ensureFxRenderer()` menulis `fx-renderer/src/generated.rs`
+   (`WIDTH`/`HEIGHT`/`FPS` sesuai video) lalu `cargo build --release`
+   (incremental ~17 dtk; build pertama bisa lama).
+2. `renderFxVideo()` → `fx-renderer.exe --spec fx_spec.json --video clip.mp4
+   render -o video_fx.mp4` (argumen root **sebelum** subcommand — jangan
+   digeser, clap global-arg di fframes rusak di kedua posisi).
+3. `buildFilterGraph(cues, afx, dur, dialIndex)` menggabung audio: afx berupa
+   cabang aecho/reverb yang di-gate `volume=-1:enable='between(t,…)':eval=frame`
+   (aecho tidak punya `enable` sendiri; trik ±volume terverifikasi dengan
+   volumedetect di dalam vs luar jendela).
+
+Env toolchain (defaults ada di `src/fxruntime.ts`, bisa dioverride):
+`FX_CARGO_HOME`, `FX_TARGET_DIR`, `FX_FFMPEG_DIR`, `FX_LIBCLANG_PATH`, `FX_TMP`
++ `FX_DISABLED=1` untuk skip stage fx. Artifact per job: `fx_spec.json`,
+`video_fx.mp4`.
 
 ## Skrip
 
@@ -90,7 +123,8 @@ npx tsx scripts/e2e.ts     # uji pipeline penuh (video → job → verifikasi)
 
 ```
 data/        runtime: autosfx.db (SQLite), sfx/, uploads/, output/jobs/<id>/, settings.json
-src/         backend TS (server, pipeline, visual, manifest, picker, render)
+src/         backend TS (server, pipeline, visual, manifest, picker, fx, render)
+fx-renderer/ sidecar Rust (fframes+Skia) untuk render efek visual
 studio/      UI Vite + React (tema studio gelap)
 scripts/     smoke & e2e
 tests/       vitest

@@ -39,6 +39,18 @@ export interface Cue {
   reason: string;
 }
 
+export interface FxCue {
+  id: string;
+  kind: 'vfx' | 'afx';
+  effect: string;
+  start: number;
+  end: number;
+  intensity: number;
+  text?: string;
+  color?: string;
+  reason: string;
+}
+
 export interface JobSummary {
   id: string;
   status: string;

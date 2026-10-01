@@ -55,6 +55,22 @@ export async function probeDuration(file: string): Promise<number> {
   return Number(j?.format?.duration ?? 0);
 }
 
+export interface VideoInfo {
+  width: number;
+  height: number;
+  fps: number;
+}
+
+/** Properti stream video utama (width/height/r_frame_rate) untuk persiapan render FX. */
+export async function probeVideoInfo(file: string): Promise<VideoInfo> {
+  const j = await runFfprobe(file);
+  const v = (j?.streams ?? []).find((s: any) => s?.codec_type === 'video');
+  if (!v || !v.width || !v.height) throw new Error('tidak ada stream video valid');
+  const [n, d] = String(v.r_frame_rate ?? '30/1').split('/').map(Number);
+  const fps = d > 0 && n > 0 ? n / d : 30;
+  return { width: Math.round(v.width), height: Math.round(v.height), fps: Math.round(fps * 1000) / 1000 };
+}
+
 /** Baca WAV PCM16 mono menjadi Float32Array (sample rate diembalikan). */
 export async function readWavMono(file: string): Promise<{ data: Float32Array; sr: number }> {
   const buf = fs.readFileSync(file);

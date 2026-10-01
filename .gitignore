@@ -10,3 +10,4 @@ data/sfx/
 *.tsbuildinfo
 data/autosfx.db*
 data/settings.json
+fx-renderer/target/
